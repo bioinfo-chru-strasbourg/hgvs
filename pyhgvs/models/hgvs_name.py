@@ -92,6 +92,41 @@ from .variants import revcomp
 CHROM_PREFIX = 'chr'
 
 
+CODON_1 = {
+    "TTT": "F", "TTC": "F", "TCT": "S", "TCC": "S", "TAT": "Y", "TAC": "Y", "TGT": "C", "TGC": "C", "TTA": "L", "TCA": "S", "TAA": "*", "TGA": "*", "TTG": "L", "TCG": "S", "TAG": "*", "TGG": "W", "CTT": "L", "CTC": "L", "CCT": "P", "CCC": "P", "CAT": "H", "CAC": "H", "CGT": "R", "CGC": "R", "CTA": "L", "CTG": "L", "CCA": "P", "CCG": "P", "CAA": "Q", "CAG": "Q", "CGA": "R", "CGG": "R", "ATT": "I", "ATC": "I", "ACT": "T", "ACC": "T", "AAT": "N", "AAC": "N", "AGT": "S", "AGC": "S", "ATA": "I", "ACA": "T", "AAA": "K", "AGA": "R", "ATG": "M", "ACG": "T", "AAG": "K", "AGG": "R", "GTT": "V", "GTC": "V", "GCT": "A", "GCC": "A", "GAT": "D", "GAC": "D", "GGT": "G", "GGC": "G", "GTA": "V", "GTG": "V", "GCA": "A", "GCG": "A", "GAA": "E", "GAG": "E", "GGA": "G", "GGG": "G"
+}
+CODON_3 = {
+    "TTT": "Phe", "TTC": "Phe", "TCT": "Ser", "TCC": "Ser", "TAT": "Tyr", "TAC": "Tyr", "TGT": "Cys", "TGC": "Cys",
+    "TTA": "Leu", "TCA": "Ser", "TAA": "*", "TGA": "*", "TTG": "Leu", "TCG": "Ser", "TAG": "*", "TGG": "Trp",
+    "CTT": "Leu", "CTC": "Leu", "CCT": "Pro", "CCC": "Pro", "CAT": "His", "CAC": "His", "CGT": "Arg", "CGC": "Arg",
+    "CTA": "Leu", "CTG": "Leu", "CCA": "Pro", "CCG": "Pro", "CAA": "Gln", "CAG": "Gln", "CGA": "Arg", "CGG": "Arg",
+    "ATT": "Ile", "ATC": "Ile", "ACT": "Thr", "ACC": "Thr", "AAT": "Asn", "AAC": "Asn", "AGT": "Ser", "AGC": "Ser",
+    "ATA": "Ile", "ACA": "Thr", "AAA": "Lys", "AGA": "Arg", "ATG": "Met", "ACG": "Thr", "AAG": "Lys", "AGG": "Arg",
+    "GTT": "Val", "GTC": "Val", "GCT": "Ala", "GCC": "Ala", "GAT": "Asp", "GAC": "Asp", "GGT": "Gly", "GGC": "Gly",
+    "GTA": "Val", "GTG": "Val", "GCA": "Ala", "GCG": "Ala", "GAA": "Glu", "GAG": "Glu", "GGA": "Gly", "GGG": "Gly"
+}
+CODON_FULL = {
+    "TTT": "Phenylalanine", "TTC": "Phenylalanine", "TCT": "Serine", "TCC": "Serine", "TAT": "Tyrosine", "TAC": "Tyrosine",
+    "TGT": "Cysteine", "TGC": "Cysteine", "TTA": "Leucine", "TCA": "Serine", "TAA": "Stop", "TGA": "Stop", "TTG": "Leucine",
+    "TCG": "Serine", "TAG": "Stop", "TGG": "Tryptophan", "CTT": "Leucine", "CTC": "Leucine", "CCT": "Proline", "CCC": "Proline",
+    "CAT": "Histidine", "CAC": "Histidine", "CGT": "Arginine", "CGC": "Arginine", "CTA": "Leucine", "CTG": "Leucine",
+    "CCA": "Proline", "CCG": "Proline", "CAA": "Glutamine", "CAG": "Glutamine", "CGA": "Arginine", "CGG": "Arginine",
+    "ATT": "Isoleucine", "ATC": "Isoleucine", "ACT": "Threonine", "ACC": "Threonine", "AAT": "Asparagine", "AAC": "Asparagine",
+    "AGT": "Serine", "AGC": "Serine", "ATA": "Isoleucine", "ACA": "Threonine", "AAA": "Lysine", "AGA": "Arginine",
+    "ATG": "Methionine", "ACG": "Threonine", "AAG": "Lysine", "AGG": "Arginine", "GTT": "Valine", "GTC": "Valine",
+    "GCT": "Alanine", "GCC": "Alanine", "GAT": "Aspartic acid", "GAC": "Aspartic acid", "GGT": "Glycine", "GGC": "Glycine",
+    "GTA": "Valine", "GTG": "Valine", "GCA": "Alanine", "GCG": "Alanine", "GAA": "Glutamic acid", "GAG": "Glutamic acid",
+    "GGA": "Glycine", "GGG": "Glycine"
+}
+
+NUCLEOTIDE_TRANSLATE = {
+    "T": "A",
+    "A": "T",
+    "G": "C",
+    "C": "G",
+}
+
+
 class HGVSRegex(object):
     """
     All regular expression for HGVS names.
@@ -280,7 +315,7 @@ class HGVSName(object):
     Represents a HGVS variant name.
     """
 
-    def __init__(self, name='', prefix='', chrom='', transcript='', gene='',
+    def __init__(self, name='', prefix='', chrom='', transcript='', transcript_protein=None, gene='', exon=None,
                  kind='', mutation_type=None, start=0, end=0, ref_allele='',
                  ref2_allele='', alt_allele='',
                  cdna_start=None, cdna_end=None, pep_extra=''):
@@ -292,7 +327,9 @@ class HGVSName(object):
         self.prefix = prefix
         self.chrom = chrom
         self.transcript = transcript
+        self.transcript_protein = transcript_protein
         self.gene = gene
+        self.exon = exon
         self.kind = kind
         self.mutation_type = mutation_type
         self.start = start
@@ -578,26 +615,32 @@ class HGVSName(object):
     def __unicode__(self):
         return self.format()
 
-    def format(self, use_prefix=True, use_gene=True, use_counsyl=False):
+    def format(self, use_prefix=True, use_gene=True, use_protein=False, use_counsyl=False, full_format=False):
         """Generate a HGVS name as a string."""
 
-        if self.kind in ('c', 'n'):
-            allele = self.kind + '.' + self.format_cdna()
-        elif self.kind == 'p':
+        if use_protein and self.format_protein():
             allele = 'p.' + self.format_protein()
-        elif self.kind in ('g', 'm'):
-            allele = self.kind + '.' + self.format_genome()
         else:
-            raise NotImplementedError("not implemented: '%s'" % self.kind)
+            if self.kind in ('c', 'n'):
+                allele = self.kind + '.' + self.format_cdna()
+            elif self.kind == 'p':
+                allele = 'p.' + self.format_protein()
+            elif self.kind in ('g', 'm'):
+                allele = self.kind + '.' + self.format_genome()
+            else:
+                raise NotImplementedError("not implemented: '%s'" % self.kind)
 
-        prefix = self.format_prefix(use_gene=use_gene) if use_prefix else ''
+        if full_format and not use_protein:
+            allele += ':p.' + self.format_protein()
+
+        prefix = self.format_prefix(use_gene=use_gene, use_protein=use_protein, full_format=full_format) if use_prefix else ''
 
         if prefix:
             return prefix + ':' + allele
         else:
             return allele
 
-    def format_prefix(self, use_gene=True):
+    def format_prefix(self, use_gene=True, use_protein=False, full_format=False):
         """
         Generate HGVS trancript/gene prefix.
 
@@ -606,20 +649,39 @@ class HGVSName(object):
           NM_007294.3(BRCA1):c.2207A>C
         """
 
-        if self.kind in ('g', 'm'):
-            if self.chrom:
-                return self.chrom
+        if full_format:
 
-        if self.transcript:
-            if use_gene and self.gene:
-                return '%s(%s)' % (self.transcript, self.gene)
-            else:
-                return self.transcript
+            prefix = []
+            if self.gene:
+                prefix.append(self.gene)
+            if self.transcript:
+                prefix.append(self.transcript)
+            if self.transcript_protein:
+                prefix.append(self.transcript_protein)
+            if self.exon: # TODO
+                prefix.append("exon"+str(self.exon))
+            return ":".join(prefix)
+
         else:
-            if use_gene:
-                return self.gene
+
+            if self.kind in ('g', 'm'):
+                if self.chrom:
+                    return self.chrom
+
+            if self.transcript:
+                if use_protein and self.transcript_protein:
+                    transcript = self.transcript_protein
+                else:
+                    transcript = self.transcript
+                if use_gene and self.gene:
+                    return '%s(%s)' % (transcript, self.gene)
+                else:
+                    return transcript
             else:
-                return ''
+                if use_gene:
+                    return self.gene
+                else:
+                    return ''
 
     def format_cdna_coords(self):
         """
@@ -707,6 +769,8 @@ class HGVSName(object):
             return (self.ref_allele + str(self.start) + '_' +
                     self.ref2_allele + str(self.end) +
                     self.pep_extra)
+        elif self.pep_extra:
+            return self.pep_extra
 
         else:
             raise NotImplementedError('protein name formatting.')

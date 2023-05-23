@@ -232,7 +232,16 @@ class Transcript(object):
             cdna_offset += cdna_match.length
 
         raise ValueError(f"Couldn't find {genomic_coord=}!")
-
+    
+    def find_exon_number(self, offset):
+        """Return the exon for a position."""
+        exon_number = 1
+        for cdna_match in self.ordered_cdna_match:
+            if cdna_match.tx_position.chrom_start <= offset <= cdna_match.tx_position.chrom_stop:
+                return exon_number
+            exon_number += 1
+        return None
+        
 
 BED6Interval_base = namedtuple(
     "BED6Interval_base", (

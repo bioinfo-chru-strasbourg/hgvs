@@ -15,7 +15,7 @@ import re
 
 from .models.cdna import CDNACoord, CDNA_START_CODON, CDNA_STOP_CODON
 from .models.genome import GenomeSubset
-from .models.hgvs_name import HGVSName, InvalidHGVSName
+from .models.hgvs_name import HGVSName, InvalidHGVSName, CODON_3
 from .models.variants import justify_indel, normalize_variant, revcomp
 
 
@@ -253,7 +253,95 @@ def parse_hgvs_name(hgvs_name, genome, transcript=None,
     return (chrom, start, ref, alt)
 
 
-def variant_to_hgvs_name(chrom, offset, ref, alt, genome, transcript,
+
+def cdna_to_protein(hgvs, offset, genome, chrom, transcript, ref, alt, mutation_type):
+
+    if hgvs.cdna_start.offset == 0 and not hgvs.pep_extra:
+
+        # InDel ? MNV ?
+        is_indel = mutation_type not in [">"]
+        is_mnv = mutation_type in ["delins"] and len(ref) == len(alt)
+
+        # gap
+        gap_offset = -1
+        gap_cdna = -1
+        gap_cdna_hgvs = +1
+        if mutation_type in [">"]:
+            gap_offset = -1
+            gap_cdna = -1
+            gap_cdna_hgvs = +1
+        if mutation_type in ["ins"]:
+            gap_offset = -1
+            gap_cdna = 0
+            gap_cdna_hgvs = +1
+        if mutation_type in ["del"]:
+            gap_offset = -1
+            gap_cdna = -1
+            gap_cdna_hgvs = +1
+
+        genomic_position = offset + gap_offset
+        cdna_position_start = hgvs.cdna_start.coord + gap_cdna
+        cdna_position_end = hgvs.cdna_end.coord + gap_cdna
+
+        # offsets / positions
+        offset_protein_mod = int(int(cdna_position_start) % 3)
+        offset_protein = int(int(cdna_position_start) / 3)
+        offset_protein_hgvs = offset_protein + gap_cdna_hgvs
+        offset_protein_end = int(int(cdna_position_end) / 3)
+        offset_genomic_codon_start = genomic_position - offset_protein_mod #- gap_ins
+        offset_genomic_codon_end = offset_genomic_codon_start + 3 + ( (offset_protein_end - offset_protein) * 3 )
+
+        # ref sequence
+        seq_ref = str(genome[str(chrom)][offset_genomic_codon_start:offset_genomic_codon_end])
+        
+        # alt sequence
+        if is_indel and not is_mnv:
+            seq_alt = ""
+        else:
+            seq_alt_split = []
+            seq_alt_split.extend(seq_ref)
+            alt_split = []
+            alt_split.extend(alt)
+            i = 0
+            while i < len(ref):
+                nuleotide = alt_split[i].upper()
+                seq_alt_split[offset_protein_mod+i] = nuleotide
+                i += 1
+            seq_alt = "".join(seq_alt_split)
+
+        # transcript strand
+        if not transcript.tx_position.is_forward_strand:
+            seq_ref = revcomp(seq_ref)
+            seq_alt = revcomp(seq_alt)
+
+        # Split codons
+        seq_ref_split_codon = re.findall('...',seq_ref)
+        seq_alt_split_codon = re.findall('...',seq_alt)
+        if not is_mnv:
+            seq_ref_split_codon = [seq_ref_split_codon[0]]
+            if len(seq_alt_split_codon):
+                seq_alt_split_codon = [seq_alt_split_codon[0]]
+
+        # codons
+        codon3_ref = ""
+        codon3_alt = ""
+        for codon in seq_ref_split_codon:
+            codon3_ref += CODON_3.get(codon)
+        for codon in seq_alt_split_codon:
+            codon3_alt += CODON_3.get(codon)
+
+        # indel alt
+        if is_indel and not is_mnv:
+            codon3_alt = "fs"
+        
+        # add protein infos
+        hgvs.pep_extra = f"{codon3_ref}{offset_protein_hgvs}{codon3_alt}"
+
+    # return
+    return hgvs
+
+
+def variant_to_hgvs_name(chrom, offset, ref, alt, genome, transcript, transcript_protein=None, exon=None,
                          max_allele_length=4, use_counsyl=False):
     """
     Populate a HGVSName from a genomic coordinate.
@@ -310,10 +398,22 @@ def variant_to_hgvs_name(chrom, offset, ref, alt, genome, transcript,
             hgvs.cdna_start = transcript.genomic_to_cdna_coord(offset_start)
             hgvs.cdna_end = transcript.genomic_to_cdna_coord(offset_end)
 
+        # pep extra
+        hgvs = cdna_to_protein(hgvs, offset, genome, chrom, transcript, ref, alt, mutation_type)
+        
+
     # Populate prefix.
     if transcript:
         hgvs.transcript = transcript.full_name
         hgvs.gene = transcript.gene.name
+
+    # Add transcript protein
+    if transcript_protein:
+        hgvs.transcript_protein = transcript_protein
+
+    # Add transcript protein
+    if exon:
+        hgvs.exon = exon
 
     # Convert alleles to transcript strand.
     if transcript and transcript.strand == '-':
@@ -337,9 +437,9 @@ def variant_to_hgvs_name(chrom, offset, ref, alt, genome, transcript,
     return hgvs
 
 
-def format_hgvs_name(chrom, offset, ref, alt, genome, transcript,
-                     use_prefix=True, use_gene=True, use_counsyl=False,
-                     max_allele_length=4):
+def format_hgvs_name(chrom, offset, ref, alt, genome, transcript, transcript_protein=None, exon=None,
+                     use_prefix=True, use_gene=True, use_protein=False, use_counsyl=False,
+                     max_allele_length=4, full_format=False):
     """
     Generate a HGVS name from a genomic coordinate.
 
@@ -349,12 +449,16 @@ def format_hgvs_name(chrom, offset, ref, alt, genome, transcript,
     alt: Alternate allele.
     genome: pygr compatible genome object.
     transcript: Transcript corresponding to allele.
+    transcript_protein: Protein Transcript corresponding to cDNA Transcript.
     use_prefix: Include a transcript/gene/chromosome prefix in HGVS name.
     use_gene: Include gene name in HGVS prefix.
+    use_protein: Use protein hgvs if exists (e.g. NM_000352.3(ABCC8):p.Asn72Ser
+                    or NP_000004(ABCC8):p.Asn72Ser if transcript_protein provided)
     max_allele_length: If allele is greater than this use allele length.
+    full_format: Use full HGVS format (e.g. EGFR:NM_001346898:exon20:c.2359C>G:p.Gln787Glu) 
     """
-    hgvs = variant_to_hgvs_name(chrom, offset, ref, alt, genome, transcript,
+    hgvs = variant_to_hgvs_name(chrom, offset, ref, alt, genome, transcript, transcript_protein=transcript_protein, exon=exon,
                                 max_allele_length=max_allele_length,
                                 use_counsyl=use_counsyl)
-    return hgvs.format(use_prefix=use_prefix, use_gene=use_gene,
-                       use_counsyl=use_counsyl)
+    return hgvs.format(use_prefix=use_prefix, use_gene=use_gene, use_protein=use_protein,
+                       use_counsyl=use_counsyl, full_format=full_format)
