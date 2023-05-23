@@ -125,7 +125,7 @@ def get_transcript(name):
     return transcripts.get(name)
 
 # Get transcript protein by cDNA transcript
-def get_transcript_protein(name):
+def get_transcript_protein(conn, name):
   transcripts_list = list(conn.query(f"SELECT protAcc FROM refseqlink WHERE mrnaAcc='{name}' OR mrnaAcc LIKE '{name}.%'").df()["protAcc"])
   if len(transcripts_list):
      if not pd.isna(transcripts_list[0]):
@@ -136,7 +136,7 @@ def get_transcript_protein(name):
      return None
 
 # Get all transcripts of a genomic position
-def get_transcripts(chr, pos, conn):
+def get_transcripts(conn, chr, pos):
   return list(conn.query(f"SELECT name FROM refgene WHERE chrom='{chr}' AND txStart<={pos} AND txEnd>={pos}").df()["name"])
 
 
@@ -273,15 +273,18 @@ while i < 1:
     hgvs_full_list = []
 
     # Transcripts list
-    transcripts_list = get_transcripts(chr, pos, conn)
+    transcripts_list = get_transcripts(conn, chr, pos)
+    #transcripts_list = ["NM_001346898"]
 
     # For each transcipt
     for transcript_name in transcripts_list:
 
       # Transcript, protien, exon
       transcript = get_transcript(transcript_name)
-      transcript_protein = get_transcript_protein(transcript_name)
+      transcript_protein = get_transcript_protein(conn, transcript_name)
       exon=transcript.find_exon_number(pos)
+      # transcript_protein = "NP_001333827.1"
+      # exon=20
       
       # print()
       # print(f"Transcript: {transcript_name}")
